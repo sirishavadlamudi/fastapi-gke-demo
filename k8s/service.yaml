@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: fastapi
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
