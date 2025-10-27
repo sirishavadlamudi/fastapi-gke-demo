@@ -5,7 +5,7 @@ metadata:
   labels:
     app: fastapi
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: fastapi
@@ -15,19 +15,7 @@ spec:
         app: fastapi
     spec:
       containers:
-        - name: fastapi
-          image: us-central1-docker.pkg.dev/sirisha-test1/fastapi-repo/fastapi:latest
-          ports:
-            - containerPort: 8080
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 20
+      - name: fastapi-container   # same name as in GitHub Actions
+        image: nginx              # temporary placeholder; CI/CD will replace this
+        ports:
+        - containerPort: 8080
