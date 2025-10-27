@@ -35,26 +35,34 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      # ✅ Install GKE Auth Plugin (to fix plugin not found issue)
+      - name: Install GKE Auth Plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin --quiet
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
       # 4️⃣ Configure Docker to use Artifact Registry
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker $GAR_LOCATION-docker.pkg.dev --quiet
 
-      # 5️⃣ Build and push Docker image
+      # 5️⃣ Build and push Docker image to Artifact Registry
       - name: Build and Push Docker image
         run: |
           IMAGE_URI=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:${{ github.sha }}
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
-      # 6️⃣ Get GKE credentials
+      # 6️⃣ Get GKE credentials (connect GitHub runner to your cluster)
       - name: Get GKE credentials
         run: |
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
           gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_LOCATION --project $PROJECT_ID
 
       # 7️⃣ Deploy to GKE
       - name: Deploy to GKE
         run: |
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
           IMAGE_URI=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:${{ github.sha }}
           kubectl set image deployment/fastapi-deployment fastapi-container=$IMAGE_URI
           kubectl rollout status deployment/fastapi-deployment
