@@ -112,12 +112,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      # Step 1: Authenticate to Google Cloud
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Install Trivy and Scan Image
+
+      # Step 2: Configure Docker to access Artifact Registry
+      - name: Configure Docker auth for GAR
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      # Step 3: Install Trivy and scan the image
+      - name: Scan Docker Image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
