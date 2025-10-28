@@ -3,4 +3,6 @@ uvicorn
 pytest
 flake8
 bandit
+pytest-cov
+httpx
 black
