@@ -81,7 +81,9 @@ jobs:
         run: |
           pip install --no-cache-dir -r app/requirements.txt
       - name: Run tests
-        run: pytest --maxfail=1 --disable-warnings --cov=app -q
+        run: |
+          export PYTHONPATH=.
+          pytest --maxfail=1 --disable-warnings --cov=app -q
 
   # ------------------ STAGE 6: Build Docker image ------------------
   build:
