@@ -106,32 +106,11 @@ jobs:
       - name: Build Docker image
         run: docker build -t $DOCKER_IMAGE:${{ github.sha }} .
 
-  # ------------------ STAGE 7: Docker Image Scan ------------------
-  scan-image:
-    name: Scan Docker Image
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Install Trivy and Scan Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-  # ------------------ STAGE 8: Push Image ------------------
+  # ------------------ STAGE 7: Push Image ------------------
   push:
     name: Push to Artifact Registry
     runs-on: ubuntu-latest
-    needs: scan-image
+    needs: build
     steps:
       - uses: actions/checkout@v4
       - name: Authenticate to Google Cloud
@@ -145,11 +124,30 @@ jobs:
       - name: Push Docker image
         run: docker push $DOCKER_IMAGE:${{ github.sha }}
 
+  # ------------------ STAGE 8: Scan Docker Image ------------------
+  scan-image:
+    name: Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: push
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Install Trivy and Scan Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+
   # ------------------ CD: Deploy to GKE ------------------
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
-    needs: push
+    needs: scan-image
     steps:
       - uses: actions/checkout@v4
 
