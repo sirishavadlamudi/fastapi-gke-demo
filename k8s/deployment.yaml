@@ -15,7 +15,7 @@ spec:
         app: fastapi
     spec:
       containers:
-      - name: fastapi-container   # 👈 Must match what CI/CD updates
-        image: us-docker.pkg.dev/sirisha-test1/fastapi-repo/fastapi-gke-demo:latest
+      - name: fastapi-container
+        image: us-central1-docker.pkg.dev/sirisha-test1/fastapi-repo/fastapi-gke-demo:latest
         ports:
         - containerPort: 8080

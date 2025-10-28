@@ -1,70 +1,154 @@
-name: CI/CD to GKE
+name: FastAPI CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 env:
   PROJECT_ID: sirisha-test1
-  GAR_LOCATION: us-central1
-  REPOSITORY: fastapi-repo
-  IMAGE: fastapi-gke-demo
-  CLUSTER_NAME: gke-demo-cluster
-  CLUSTER_LOCATION: us-central1-a
+  GKE_CLUSTER: gke-demo-cluster
+  GKE_ZONE: us-central1-a
+  IMAGE_NAME: fastapi-gke-demo
+  DOCKER_IMAGE: us-central1-docker.pkg.dev/sirisha-test1/fastapi-repo/fastapi-gke-demo
 
 jobs:
-  build-deploy:
+  # ------------------ STAGE 1: Checkout ------------------
+  checkout:
+    name: Checkout code & setup
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Authenticate to Google Cloud
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+  # ------------------ STAGE 2: Install dependencies ------------------
+  install:
+    name: Install dependencies
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir -r app/requirements.txt
+
+  # ------------------ STAGE 3: Linting ------------------
+  lint:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install flake8
+        run: pip install flake8 black
+      - name: Run flake8
+        run: flake8 app --max-line-length=100
+      - name: Run black (format check)
+        run: black --check app
+
+  # ------------------ STAGE 4: Security Scanning ------------------
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bandit
+        run: pip install bandit
+      - name: Run Bandit scan
+        run: bandit -r app -ll
+
+  # ------------------ STAGE 5: Unit Test ------------------
+  test:
+    name: Unit Test & Coverage
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install pytest pytest-cov
+      - name: Run tests
+        run: pytest --maxfail=1 --disable-warnings --cov=app -q
+
+  # ------------------ STAGE 6: Build Docker image ------------------
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v4
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # 3️⃣ Set up gcloud CLI
-      - name: Set up gcloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-
-      # ✅ Install GKE Auth Plugin (to fix plugin not found issue)
-      - name: Install GKE Auth Plugin
-        run: |
-          gcloud components install gke-gcloud-auth-plugin --quiet
-          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-      # 4️⃣ Configure Docker to use Artifact Registry
       - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker $GAR_LOCATION-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      # 5️⃣ Build and push Docker image to Artifact Registry
-      - name: Build and Push Docker image
-        run: |
-          IMAGE_URI=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:${{ github.sha }}
-          docker build -t $IMAGE_URI .
-          docker push $IMAGE_URI
+      - name: Build Docker image
+        run: docker build -t $DOCKER_IMAGE:${{ github.sha }} .
 
-      # 6️⃣ Get GKE credentials (connect GitHub runner to your cluster)
+  # ------------------ STAGE 7: Docker Image Scan ------------------
+  scan-image:
+    name: Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Install Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+
+  # ------------------ STAGE 8: Push Image ------------------
+  push:
+    name: Push to Artifact Registry
+    runs-on: ubuntu-latest
+    needs: scan-image
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Push Docker image
+        run: docker push $DOCKER_IMAGE:${{ github.sha }}
+
+  # ------------------ CD: Deploy to GKE ------------------
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: push
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
       - name: Get GKE credentials
-        run: |
-          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_LOCATION --project $PROJECT_ID
+        run: gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $PROJECT_ID
 
-      # 7️⃣ Deploy to GKE
       - name: Deploy to GKE
         run: |
-          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-          IMAGE_URI=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:${{ github.sha }}
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl set image deployment/fastapi-deployment fastapi-container=$IMAGE_URI
+          kubectl set image deployment/fastapi-deployment fastapi-container=$DOCKER_IMAGE:${{ github.sha }}
           kubectl rollout status deployment/fastapi-deployment

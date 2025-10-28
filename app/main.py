@@ -5,4 +5,4 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI on GKE!"}
+    return {"message": "Hello from FastAPI on GKE with CI/CD!"}
