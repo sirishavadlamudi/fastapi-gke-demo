@@ -137,6 +137,4 @@ jobs:
           git config --global user.name "github-actions"
           git add k8s/deployment.yaml
           git commit -m "Update deployment image to ${{ github.sha }}"
-          git push https://github.com/sirishavadlamudi/fastapi-gke-demo.git HEAD:main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          git push https://${{ secrets.GH_PAT }}@github.com/sirishavadlamudi/fastapi-gke-demo.git HEAD:main
