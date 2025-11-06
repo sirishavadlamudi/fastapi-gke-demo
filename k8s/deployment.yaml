@@ -16,6 +16,7 @@ spec:
     spec:
       containers:
       - name: fastapi-container
-        image: us-central1-docker.pkg.dev/sirisha-test1/fastapi-repo/fastapi-gke-demo:latest
+        image: us-central1-docker.pkg.dev/sirisha-test1/fastapi-repo/fastapi-gke-demo:{{TAG}}
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080

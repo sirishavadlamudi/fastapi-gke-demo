@@ -6,4 +6,4 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI on GKE with CI/CD!"}
+    return {"message": "Hello from FastAPI on GKE with CI pipeline + Argo CD CD Deployment"}
