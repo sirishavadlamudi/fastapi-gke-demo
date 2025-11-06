@@ -126,6 +126,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true   # ✅ Allows pushes using GITHUB_TOKEN
 
       - name: Update deployment.yaml with new image tag
         run: |
@@ -136,9 +138,9 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
           git add k8s/deployment.yaml
-          git commit -m "Update deployment image to ${{ github.sha }}" || exit 0
+          git commit -m "Update deployment image to ${{ github.sha }}" || echo "No changes to commit"
           git push origin HEAD:main
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # ✅ Default token for the repo
 
 
