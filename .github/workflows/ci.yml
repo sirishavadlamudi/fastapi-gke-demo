@@ -127,11 +127,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: true   # ✅ Allows pushes using GITHUB_TOKEN
+          persist-credentials: true  # ✅ Allows pushes using GITHUB_TOKEN
 
       - name: Update deployment.yaml with new image tag
         run: |
-          sed -i "s|image:.*|image: $DOCKER_IMAGE:${{ github.sha }}|" k8s/deployment.yaml
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sed -i "s|image:.*|image: $DOCKER_IMAGE:${{ github.sha }}|" k8s/deployment.yaml
+          else
+            sed -i '' "s|image:.*|image: $DOCKER_IMAGE:${{ github.sha }}|" k8s/deployment.yaml
+          fi
 
       - name: Commit & push updated deployment.yaml
         run: |
@@ -140,7 +144,5 @@ jobs:
           git add k8s/deployment.yaml
           git commit -m "Update deployment image to ${{ github.sha }}" || echo "No changes to commit"
           git push origin HEAD:main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # ✅ Default token for the repo
 
 
