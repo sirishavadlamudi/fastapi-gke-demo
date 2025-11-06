@@ -132,13 +132,13 @@ jobs:
           sed -i "s|image:.*|image: $DOCKER_IMAGE:${{ github.sha }}|" k8s/deployment.yaml
 
       - name: Commit & push updated deployment.yaml
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
           git add k8s/deployment.yaml
           git commit -m "Update deployment image to ${{ github.sha }}" || exit 0
-          git push "https://${GH_PAT}:x-oauth-basic@github.com/sirishavadlamudi/fastapi-gke-demo.git" HEAD:main
+          git push origin HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
